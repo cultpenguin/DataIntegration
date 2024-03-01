@@ -17,65 +17,6 @@
 
 # %% [markdown]
 # # Probabilistic polynomial linefitting
-# This exercise a simple case of linefitting, where we have a set of observations 
-# $\mathbf{d}_{obs}$ at locations $\mathbf{x}_{obs}$.
-# We will use the extended Metropolis algorithm to sample from the posterior distribution of the model parameters $m_1$, $m_2$, and $m_3$.
-#
-# It is expected that the realtion between the position and the data can be described by a 2nd order polynomial, paramterized as $\mathbf{m} = [m_1, m_2, m_3]$, such that forward problem can be described by 
-#
-# $$ 
-#   d = g(\mathbf{m},x) = m_1 + m_2 x + m_3 x^2 
-# $$.
-#
-#
-# The key question to answer is: What is the probability distribution of the data at x=40, given all the available information?
-#
-# Two data sets will be considered.
-# The first data set consists of 5 observations, $\mathbf{d}_{obs_{1}}$, at locations $\mathbf{x}_{obs_{1}}$. Measurement noise is characterized by a Gaussian distribution with zero mean, and standard deviation as given in $\mathbf{d}_{std_{1}}$:
-# $$
-# \mathbf{x}_{obs_{1}} =  [2.5593,  14.2569,  15.0507,  19.0726,  26.9363] \\
-# \mathbf{d}_{obs_{1}} = [2.3911,  -8.1902, -21.9646, -6.3345, 32.5775] \\
-# \mathbf{d}_{std_{1}} = [8,     8,    40,     8,     8] 
-# $$
-# Data are available in the 'linefit_nd05.mat' mat-file.
-#
-# The second data set consists of 35 observations, $\mathbf{d}_{obs_{2}}$, at locations $\mathbf{x}_{obs_{2}}$. Measurement noise is characterized by a Gaussian distribution with zero mean, and standard deviation as given in $\mathbf{d}_{std_{2}}$. Data are available in the 'linefit_nd35.mat' mat-file.
-# ## Data integration
-# Both direct and indirect information about $\mathbf{m}$ are available. 
-#
-# The direct information is given by the prior distribution $f_1(\mathbf{m})$, also referred to as the prior model, which is the probability distribution of the model parameters.
-#
-# The indirect information $f_2(\mathbf{m})$ represent how well the forward response of a set of model parameters $\mathbf{m}$ explains the observed data. This is also referred to as the likelihood function, which is the probability distribution of the data given the model parameters.
-# The combined infromation about $\mathbf{m}$ can be obtained by conjunction of $f_1(\mathbf{m})$ and $f_2(\mathbf{m})$, following Tarantola and Valette (1982), as 
-# $$
-#    f_{12}(\mathbf{m}) \propto f_1(\mathbf{m}) + f_2(\mathbf{m})
-# $$
-# or, using standard Bayesian notation, as  
-# $$
-#    \sigma(\mathbf{m}) \propto \rho(\mathbf{m}) + L(\mathbf{m})
-# $$
-#
-# ## Direct information
-#
-# The direct information for each of the model parameters is assumed to be independent, such that
-# $$
-# f_1(\mathbf{m}) \ = \ f_1(m_1,m_2,m_3) = f_1(m_1) f_1(m_2) f_1(m_3)
-# $$
-# The prior information on $m_1$ is 1D Gaussian model, and the prior for $m_2$ and $m_3$ is chosen to be uniformly distributed as:
-# $$
-# f_1(m_1)  \propto N(0,10) \\
-# f_1(m_2)   \propto  U(-10,10) = 1/20 \ \textrm{for}\  -10 \le m_2 \le 10\\
-# f_1(m_3)  \propto  U(-.1,.1)  =  1/(0.2) \ \textrm{for}\  -0.1 \le m_3 \le 0.1
-# $$
-#
-#
-# ## Indirect information
-#
-# $$
-# f_2(m | d_{obs}) \  =  \Big ( \prod_i \frac{1}{2 \ \sigma^i} \Big ) \ \exp \Bigg ( -\frac{1}{2} \sum_i^N \frac{(d^i - d^i_{obs} )^2}{(\sigma^i)^2}  \Bigg )\\
-# % = \exp  \Bigg ( -\frac{1}{2} \sum_i \frac{(d^i - d^i_{obs} )^2}{(\sigma^i)^2} \Bigg ) 
-# $$
-#
 
 
 # %% import the necessary libraries
@@ -88,7 +29,7 @@ import time
 
 
 # %% Some building blocks
-def proposal_sample():
+def sample_proposal():
     # propose m1, m2, m3
     m1 = np.random.uniform(-30, 30)
     m2 = np.random.uniform(-10, 10)
@@ -203,7 +144,7 @@ def plot_lines(m_sample, nshow=500):
 
 # %% Load data and plot the data
 M=sp.io.loadmat('linefit_nd05.mat') # loads the data set with 5 observations
-M=sp.io.loadmat('linefit_nd35.mat') # loads the data set with 35 observations
+#M=sp.io.loadmat('linefit_nd35.mat') # loads the data set with 35 observations
 
 d_obs = np.float32(M['d_obs'].flatten()) # Extract the 1D array from the loaded data
 d_std = np.float32(M['d_std'].flatten())
@@ -234,7 +175,7 @@ f2 = f2_pdf(d, d_obs, d_std)
 
 # %% Generate a sample from f1(m), and plot the corresponding lines
 
-ns=10000
+ns=400
 m_prior = np.zeros((ns,3))
 d_prior = np.zeros((ns,nx))
 
@@ -260,124 +201,87 @@ plot_sample_histogram(m_prior)
 
 
 # %% [markdown]
-# # The Metropolis algorithm
+# # The rejection sampler
 #
 
 
-# %% The independent extended Metropolis algorithm
+# %% The rejection sampler
+
+if len(d_obs)==5:
+    f_max = -6.2
+else:   
+    f_max = -26.24
 
 T = 1 # 1 is no annealing
-N = 40000 # number of itearations
-if len(d_obs)==35:
-    step = 0.1*np.array([10,1,.1])
+
+if len(d_obs)==5:
+    N = 800000 # number of itearations
 else:
-    step = .25*np.array([10,1,.1])
+    N = 4000000
 
 # preallocate memory
 m_post = np.zeros((N, 3))
 f2_post = np.zeros(N)
 f12_post = np.zeros(N)
 
-# Propose a starting model
-m_cur = f1_sample()
-m_cur = np.array([0,0,0])
-d_cur = forward(m_cur, x_obs)
-f2_cur = f2_pdf(d_cur, d_obs, d_std)
-f1_cur = f1_pdf(m_cur)
-f12_cur = f1_cur + f2_cur
-
-Nacc = 0
+iacc = -1
 t0=time.time()
 for i in range(N):
     
-    # Perturb the current mopdel using a sampel from a symmetrical proposal distrution
-    m_perturb = a=np.random.randn(3)*step
-    m_pro = m_cur + m_perturb
-    # Compute f2
-    d_pro = forward(m_pro, x_obs)
-    f2_pro = f2_pdf(d_pro, d_obs, d_std)
-    f1_pro = f1_pdf(m_pro)
-    f12_pro = f1_pro + f2_pro
+    # propose m1, m2, m3
+    m_pro= sample_proposal()
     
-    # 2c. Accept reject
-    #P_acc = np.exp(f1_pro - f1_cur) ** (1 / T)
-    #P_acc = np.exp(f2_pro - f2_cur) ** (1 / T)
-    P_acc = np.exp(f12_pro - f12_cur) ** (1 / T)
+    # compute f12 = f1*f2
+    # f1 / direct
+    f1 = f1_pdf(m_pro)
+    # f2 / indirect
+    d = forward(m_pro, x_obs)
+    f2 = f2_pdf(d, d_obs, d_std)
+
+    f12 = f1 + f2
+    if f12 > f_max:
+        f_max = f12+.01
+        print(f'Updates f_max = {f_max} (!!!)')
+
+    P_acc = np.exp(f12 - f_max) ** (1 / T)
     
     if np.random.rand() < P_acc:
-        Nacc += 1
-
-        # accept move and update current model
-        m_cur = m_pro.copy()
-        d_cur = d_pro.copy()
-        f2_cur = f2_pro.copy()
-        f1_cur = f1_pro.copy()
-        f12_cur = f12_pro.copy()
-
-    m_post[i,:] = m_cur
-    f12_post[i] = f2_cur
+        iacc += 1
+        m_post[iacc,:] = m_pro
+        f12_post[iacc] = f12
 
     if np.mod(i, 20000) == 0:
-        print('i=%5d, Nacc = %4d, AcceptRatio = %f, m_cur=[%f,%f,%f]' %(i,Nacc,Nacc/(i+1),m_cur[0], m_cur[1], m_cur[2]))
+        print('i=%5d, Nacc = %4d, AcceptRatio = %f' %(i,iacc,iacc/(i+1)))
 
 
 t=time.time()-t0
 print('Time = %3.1fs.' % t)
-print(f'Accepted %d of %d models, PacceptRatio = %5.4f' % (Nacc,N,Nacc/N))
-print('%3.1f iterations per accepted model.' % (np.ceil(N/Nacc)))
+print(f'Accepted %d of %d models, PacceptRatio = %5.4f' % (iacc,N,iacc/N))
+print('%3.1f iterations per accepted model.' % (np.ceil(N/iacc)))
 
-
-
-# %% [markdown]
-# ### Analyze the generated model to find the burn-in and the number of independent realizations
-
-# %% Identify burn-in from the figures and remove all realizations before burn-in form m_post
-n_burnin = 1000
-
-ax = plot_sample(m_prior)
-plot_sample(m_post, ax)
-plt.axvline(x=n_burnin, color='r')
-plt.suptitle('Prior and Po*sterior samples BEFORE removing burn-in')
-plt.show()
-
-plt.figure()
-plt.semilogx(f12_post)
-plt.ylabel('log(f12)')
-plt.xlabel('Iteration number')
-plt.axvline(x=n_burnin, color='r')
-plt.grid()
-plt.title('f12 values - before removing burn-in')
-
-
-
-# %% [markdown]
-# As the burnin is selected to be at n_burnin = {{n_burnin}}, alle realizations before this index will be removed from m_post and f12_post.
-#
-
-# %% Remove realizations before burn-in
-m_post = m_post[n_burnin:,:]
-f12_post = f12_post[n_burnin:]
+m_post=m_post[0:iacc,:]
+f12_post=f12_post[0:iacc]
 
 # %%
 
 ax = plot_sample(m_prior)
 plot_sample(m_post, ax)
-plt.suptitle('Prior and Posterior samples after removing burn-in')
+plt.suptitle('Prior and Posterior sample')
 plt.show()
 
 plt.figure()
 plt.semilogx(f12_post)
 plt.ylabel('log(f12)')
-plt.xlabel('Iteration number')
+plt.xlabel('Accepted model number')
 plt.grid()
-plt.title('f12 values - after removing burn-in')
+plt.title('f12 values')
 
 # %% [markdown]
 # ## Estimate the number of independent realizations
 # N={{N}} realizations of the posterior distribution have been generated. The next step is to estimate the number of independent realizations. This can be done, for example, by computing the autocorrelation of the realizations of m1, m2, and m3.         
 
 # %% Make autocorrelation plots of m1, m2, m3
-plot_autocorrelation(m_post, maxlags=500)
+plot_autocorrelation(m_post, maxlags=10)
 
 # %% [markdown]
 # When the autocorrelation of the realizations of m1, m2, and m3 is close to zero, it suggest the number of iterations need to obtain an independent realization. 
@@ -488,3 +392,5 @@ print('P(d<%3.1f | f1,prior) = %5.3f' % (d_thres, P_prior))
 print('P(d<%3.1f | f12,post) = %5.3f' % (d_thres, P_post))
 
 
+
+# %%

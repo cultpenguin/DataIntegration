@@ -101,6 +101,39 @@ def f1_sample():
     m3 = np.random.uniform(-.1,.1)
     return np.array([m1,m2,m3])
 
+
+def f1_sample_metropolis(m_current=np.array([0,0,0]), 
+                            step=np.array([1, .1 ,.01])):
+    
+    
+    m_propose = m_current.copy() + step * np.random.randn(3)
+
+
+    f1_cur =  sp.stats.norm.pdf(m_current[0], 0, 10)
+    f2_cur=1
+    if np.abs(m_current[1])>1:
+        f2_cur = 0
+    f3_cur=1    
+    if np.abs(m_current[2])>.1:
+        f3_cur = 0
+    f_current = f1_cur*f2_cur*f3_cur
+
+    f1_pro =  sp.stats.norm.pdf(m_propose[0], 0, 10)
+    f2_pro=1
+    if np.abs(m_propose[1])>1:
+        f2_pro = 0
+    f3_pro=1
+    if np.abs(m_propose[2])>.1:
+        f3_pro = 0
+    f_propose = f1_pro*f2_pro*f3_pro    
+
+    P_acc = f_propose/f_current
+    if np.random.uniform(0, 1) < P_acc:
+        m_current = m_propose
+            
+    return m_current
+
+
 def forward(m,x_obs):
     d = m[0] + m[1] * x_obs + m[2] * x_obs**2
     return d
@@ -264,7 +297,7 @@ plot_sample_histogram(m_prior)
 #
 
 
-# %% The independent extended Metropolis algorithm
+# %% The extended Metropolis algorithm
 
 T = 1 # 1 is no annealing
 N = 40000 # number of itearations
@@ -283,26 +316,20 @@ m_cur = f1_sample()
 m_cur = np.array([0,0,0])
 d_cur = forward(m_cur, x_obs)
 f2_cur = f2_pdf(d_cur, d_obs, d_std)
-f1_cur = f1_pdf(m_cur)
-f12_cur = f1_cur + f2_cur
 
 Nacc = 0
 t0=time.time()
 for i in range(N):
     
-    # Perturb the current mopdel using a sampel from a symmetrical proposal distrution
-    m_perturb = a=np.random.randn(3)*step
-    m_pro = m_cur + m_perturb
+    # Perform a random walk in f1
+    m_pro = f1_sample_metropolis(m_cur, step)
+
     # Compute f2
     d_pro = forward(m_pro, x_obs)
     f2_pro = f2_pdf(d_pro, d_obs, d_std)
-    f1_pro = f1_pdf(m_pro)
-    f12_pro = f1_pro + f2_pro
     
     # 2c. Accept reject
-    #P_acc = np.exp(f1_pro - f1_cur) ** (1 / T)
-    #P_acc = np.exp(f2_pro - f2_cur) ** (1 / T)
-    P_acc = np.exp(f12_pro - f12_cur) ** (1 / T)
+    P_acc = np.exp(f2_pro - f2_cur) ** (1 / T)
     
     if np.random.rand() < P_acc:
         Nacc += 1
@@ -311,13 +338,11 @@ for i in range(N):
         m_cur = m_pro.copy()
         d_cur = d_pro.copy()
         f2_cur = f2_pro.copy()
-        f1_cur = f1_pro.copy()
-        f12_cur = f12_pro.copy()
-
+        
     m_post[i,:] = m_cur
-    f12_post[i] = f2_cur
+    f2_post[i] = f2_cur
 
-    if np.mod(i, 20000) == 0:
+    if np.mod(i, 2000) == 0:
         print('i=%5d, Nacc = %4d, AcceptRatio = %f, m_cur=[%f,%f,%f]' %(i,Nacc,Nacc/(i+1),m_cur[0], m_cur[1], m_cur[2]))
 
 
@@ -332,7 +357,7 @@ print('%3.1f iterations per accepted model.' % (np.ceil(N/Nacc)))
 # ### Analyze the generated model to find the burn-in and the number of independent realizations
 
 # %% Identify burn-in from the figures and remove all realizations before burn-in form m_post
-n_burnin = 1000
+n_burnin = 200
 
 ax = plot_sample(m_prior)
 plot_sample(m_post, ax)
@@ -341,12 +366,12 @@ plt.suptitle('Prior and Po*sterior samples BEFORE removing burn-in')
 plt.show()
 
 plt.figure()
-plt.semilogx(f12_post)
-plt.ylabel('log(f12)')
+plt.semilogx(f2_post)
+plt.ylabel('log(f2) - log-likelihood')
 plt.xlabel('Iteration number')
 plt.axvline(x=n_burnin, color='r')
 plt.grid()
-plt.title('f12 values - before removing burn-in')
+plt.title('f2 values - before removing burn-in')
 
 
 
@@ -356,7 +381,7 @@ plt.title('f12 values - before removing burn-in')
 
 # %% Remove realizations before burn-in
 m_post = m_post[n_burnin:,:]
-f12_post = f12_post[n_burnin:]
+f2_post = f2_post[n_burnin:]
 
 # %%
 
@@ -366,11 +391,11 @@ plt.suptitle('Prior and Posterior samples after removing burn-in')
 plt.show()
 
 plt.figure()
-plt.semilogx(f12_post)
-plt.ylabel('log(f12)')
+plt.semilogx(f2_post)
+plt.ylabel('log(f2)')
 plt.xlabel('Iteration number')
 plt.grid()
-plt.title('f12 values - after removing burn-in')
+plt.title('f2 values - after removing burn-in')
 
 # %% [markdown]
 # ## Estimate the number of independent realizations
@@ -479,12 +504,12 @@ plt.legend()
 plt.savefig(f'linefitA_N{len(d_obs)}_p40_prior.png')
 
 
-
 # %% Compute the probability P(d<77)
 d_thres=77
 P_prior = np.sum(d40_prior < d_thres) / len(d40_prior)
 P_post = np.sum(d40_post < d_thres) / len(d40_post)
-print('P(d<%3.1f | f1,prior) = %5.3f' % (d_thres, P_prior))
-print('P(d<%3.1f | f12,post) = %5.3f' % (d_thres, P_post))
+print('P(d<%3.1f | f1,prior) = %5.4f' % (d_thres, P_prior))
+print('P(d<%3.1f | f12,post) = %5.4f' % (d_thres, P_post))
 
 
+# %%
