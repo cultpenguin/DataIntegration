@@ -26,9 +26,9 @@ negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 N_use = 100000
 
 # hdf5 file with training data
-file_training = '1D_P51_NO500_451_ABC5000000_0000_D2_HTX1_1.h5'
+file_training = '1D_P22_NO500_451_ABC5000000_0000_D2_HTX1_1.h5'
 # hdf5 file with real data
-file_sampling = '1D_P51_NO500_451_ABC5000000_0000_D2_HTX1_1_ME0_aT1_CN1.h5'
+file_sampling = '1D_P22_NO500_451_ABC5000000_0000_D2_HTX1_1_ME0_aT1_CN1.h5'
 
 f_training = h5py.File(file_training, 'r')
 f_sampling = h5py.File(file_sampling, 'r')
