@@ -5,6 +5,7 @@ import tensorflow_probability as tfp
 import numpy as np
 import time
 import h5py
+import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
@@ -61,6 +62,7 @@ nd=D.shape[1]
 nm=M.shape[1]
 print('nm= %d' % nm)
 print('nd= %d' % nd)
+plt.figure(1)
 plt.subplot(1,2,1)
 plt.plot(M[0:10,:].T)
 plt.title('model realization')
@@ -98,7 +100,7 @@ for i in range(nhidden-1):
         model.add(tf.keras.layers.Dropout(pdropout))
 
 # 1D as output normal distribution
-d_floor = 0.1#1e-3 
+d_floor = 1e-3 
 d_scale=1
 model.add(tf.keras.layers.Dense(nm+nm))
 model.add(tfp.layers.DistributionLambda(lambda t: tfp.distributions.Normal(loc=t[..., :nm],
@@ -118,7 +120,7 @@ model.summary()
 
 
 #%% Train the model
-nepochs = 10
+nepochs = 100
 batch_size = 512
 patience = 50 # max number of itarations with no improvement in validation loss
 use_learningrate_schedule = False
@@ -155,13 +157,14 @@ out = model.fit(d_train, m_train,
     )
 
 # %% Plot loss
-plt.figure(1)
+plt.figure(2)
 plt.semilogy(out.history['loss'], label='Train')
 plt.semilogy(out.history['val_loss'], label='Validation')
 plt.xlabel('Iteration #')
 plt.ylabel('Loss')
 plt.grid()
 plt.legend()
+plt.savefig(modelname + '_history')   
 
 # %% Use the trained network for prediction
 t0=time.time()
@@ -172,7 +175,7 @@ t1=time.time()
 t_pred = t1-t0
 print('Time elapsed for prediction: %f3.3 s' % t_pred)
 
-plt.figure(2)
+plt.figure(3)
 plt.subplot(4,1,1)
 plt.imshow(M_ml_mean, vmin=-1, vmax=3, cmap='jet')
 plt.colorbar(label='log_10(ρ)')

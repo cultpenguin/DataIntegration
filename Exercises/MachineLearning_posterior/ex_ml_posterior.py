@@ -1,18 +1,16 @@
 #%% Computing posterior statistics form the posterior distribution using machine learning
 
 import tensorflow as tf
-#import tensorflow_probability as tfp
 import numpy as np
-import time
 import h5py
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-
+plt.ion()
 
 #%% Load data
 
 # Set training data size to use
-N_use = 10000
+N_use = 100000
 
 # hdf5 file with training data
 file_training = '1D_P22_NO500_451_ABC5000000_0000_D2_HTX1_1.h5'
@@ -50,6 +48,7 @@ nd=D.shape[1]
 nm=M.shape[1]
 print('nm= %d' % nm)
 print('nd= %d' % nd)
+plt.figure(1)
 plt.subplot(1,2,1)
 plt.plot(M[0:10,:].T)
 plt.title('model realization')
@@ -61,6 +60,7 @@ plt.plot(D[0:10,:].T)
 plt.xlabel('data #')
 plt.ylabel('data value')
 plt.tight_layout()
+plt.show()
 
 
 # %% Split data into training and validation sets
@@ -105,22 +105,23 @@ out = model.fit(d_train, m_train,
 
 # %%
 # Plot loss
-plt.figure(1)
+plt.figure(2)
 plt.semilogy(out.history['loss'], label='Train')
 plt.semilogy(out.history['val_loss'], label='Validation')
 plt.xlabel('Iteration #')
 plt.ylabel('Loss')
 plt.grid()
 plt.legend()
-plt.savefig(fout + '_history')   
+plt.show()
 
 # %%
 M_EST = model.predict(D_obs)
 
 
+plt.figure(3)
 plt.imshow(M_EST.T, vmin=-1, vmax=3, )
 plt.colorbar(label='log_10(ρ)')
 plt.xlabel('Location #')
 plt.ylabel('Depth')
-
+plt.show()
 # %%

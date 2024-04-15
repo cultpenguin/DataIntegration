@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 import time
 import h5py
+import os 
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
@@ -20,7 +21,7 @@ def scheduler(epoch,lr):
 #%% Load data
 
 # Set training data size to use
-N_use = 10000
+N_use = 1000
 
 # hdf5 file with training data
 file_training = '1D_P22_NO500_451_ABC5000000_0000_D2_HTX1_1.h5'
@@ -58,6 +59,7 @@ nd=D.shape[1]
 nm=M.shape[1]
 print('nm= %d' % nm)
 print('nd= %d' % nd)
+plt.figure(1)
 plt.subplot(1,2,1)
 plt.plot(M[0:10,:].T)
 plt.title('model realization')
@@ -146,14 +148,14 @@ out = model.fit(d_train, m_train,
     )
 
 # %% Plot loss
-plt.figure(1)
+plt.figure(2)
 plt.semilogy(out.history['loss'], label='Train')
 plt.semilogy(out.history['val_loss'], label='Validation')
 plt.xlabel('Iteration #')
 plt.ylabel('Loss')
 plt.grid()
 plt.legend()
-plt.savefig(fout + '_history')   
+plt.savefig(modelname + '_history')   
 
 # %%
 t0 = time.time()
@@ -162,7 +164,7 @@ t1 = time.time()
 t_elapsed = t1-t0
 print('Time elapsed for prediction: %f3.3 s' % t_elapsed)
 
-plt.figure(2)
+plt.figure(3)
 plt.subplot(3,1,1)
 plt.imshow(M_EST.T, vmin=-1, vmax=3, cmap='jet')
 plt.colorbar(label='log_10(ρ)')
